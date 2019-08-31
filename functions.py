@@ -2,9 +2,6 @@ import segyio
 import numpy as np
 import torch
 from bruges.filters.wavelets import ormsby
-#from models_old import forward_model
-from skimage.measure import compare_ssim as ssim
-#%% # default parameters
 
 def get_params():
     params = dict()
