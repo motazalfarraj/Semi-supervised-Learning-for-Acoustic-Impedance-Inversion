@@ -90,7 +90,7 @@ def get_models(args):
     if args.test_checkpoint is None:
         inverse_net = inverse_model(nonlinearity=args.nonlinearity)
         forward_net = forward_model(nonlinearity=args.nonlinearity)
-        optimizer = optim.Adam(list(inverse_model.parameters())+list(forward_model.parameters()), amsgrad=True,lr=0.005)
+        optimizer = optim.Adam(list(inverse_net.parameters())+list(forward_net.parameters()), amsgrad=True,lr=0.005)
     else:
         try:
             inverse_net = torch.load(args.test_checkpoint + "_inverse")
@@ -101,13 +101,11 @@ def get_models(args):
             print("No checkpoint found at '{}'- Please specify the model for testing".format(args.test_checkpoint))
             exit()
 
-    forward_net = forward_model(wavelet=wavelet)
-
     if torch.cuda.is_available():
         inverse_net.cuda()
         forward_net.cuda()
 
-    return inverse_net, forward_net
+    return inverse_net, forward_net, optimizer
 
 def train(args):
 
@@ -171,7 +169,7 @@ def test(args):
     test_loader, seismic_normalization, acoustic_normalization = get_data(args, test=True)
     if args.test_checkpoint is None:
         args.test_checkpoint = "./checkpoints/{}".format(args.session_name)
-    inverse_net, forward_net = get_models(args)
+    inverse_net, forward_net, _ = get_models(args)
     criterion = nn.MSELoss(reduction="sum")
     predicted_impedance = []
     true_impedance = []
