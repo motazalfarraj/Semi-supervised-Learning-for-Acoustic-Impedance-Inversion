@@ -6,35 +6,34 @@ from torch.nn.functional import conv1d
 
 
 
-class InverseModel(nn.Module):
-    def __init__(self, num_angles, vertical_scale):
-        super(InverseModel, self).__init__()
-        self.num_angles = num_angles
+class inverse_model(nn.Module):
+    def __init__(self, vertical_scale):
+        super(inverse_model, self).__init__()
         self.vertical_scale = vertical_scale
         self.activation = nn.Tanh()
 
-        self.cnn1 = nn.Sequential(nn.Conv1d(in_channels=self.num_angles,
+        self.cnn1 = nn.Sequential(nn.Conv1d(in_channels=1,
                                            out_channels=8,
                                            kernel_size=5,
                                            padding=2,
                                            dilation=1),
-                                  nn.GroupNorm(num_groups=self.num_angles,
+                                  nn.GroupNorm(num_groups=1,
                                                num_channels=8))
 
-        self.cnn2 = nn.Sequential(nn.Conv1d(in_channels=self.num_angles,
+        self.cnn2 = nn.Sequential(nn.Conv1d(in_channels=1,
                                            out_channels=8,
                                            kernel_size=5,
                                            padding=6,
                                            dilation=3),
-                                  nn.GroupNorm(num_groups=self.num_angles,
+                                  nn.GroupNorm(num_groups=1,
                                                num_channels=8))
 
-        self.cnn3 = nn.Sequential(nn.Conv1d(in_channels=self.num_angles,
+        self.cnn3 = nn.Sequential(nn.Conv1d(in_channels=1,
                                            out_channels=8,
                                            kernel_size=5,
                                            padding=12,
                                            dilation=6),
-                                  nn.GroupNorm(num_groups=self.num_angles,
+                                  nn.GroupNorm(num_groups=1,
                                                num_channels=8))
 
         self.cnn = nn.Sequential(self.activation,
@@ -42,7 +41,7 @@ class InverseModel(nn.Module):
                                            out_channels=16,
                                            kernel_size=3,
                                            padding=1),
-                                 nn.GroupNorm(num_groups=self.num_angles,
+                                 nn.GroupNorm(num_groups=1,
                                               num_channels=16),
                                  self.activation,
 
@@ -50,18 +49,18 @@ class InverseModel(nn.Module):
                                            out_channels=16,
                                            kernel_size=3,
                                            padding=1),
-                                 nn.GroupNorm(num_groups=self.num_angles,
+                                 nn.GroupNorm(num_groups=1,
                                               num_channels=16),
                                  self.activation,
 
                                  nn.Conv1d(in_channels=16,
                                            out_channels=16,
                                            kernel_size=1),
-                                 nn.GroupNorm(num_groups=self.num_angles,
+                                 nn.GroupNorm(num_groups=1,
                                               num_channels=16),
                                  self.activation)
 
-        self.gru = nn.GRU(input_size=self.num_angles,
+        self.gru = nn.GRU(input_size=1,
                           hidden_size=8,
                           num_layers=3,
                           batch_first=True,
@@ -72,7 +71,7 @@ class InverseModel(nn.Module):
                                                    stride=2,
                                                    kernel_size=4,
                                                    padding=1),
-                                nn.GroupNorm(num_groups=self.num_angles,
+                                nn.GroupNorm(num_groups=1,
                                              num_channels=8),
                                 self.activation,
 
@@ -81,7 +80,7 @@ class InverseModel(nn.Module):
                                                    stride=2,
                                                    kernel_size=4,
                                                    padding=1),
-                                nn.GroupNorm(num_groups=self.num_angles,
+                                nn.GroupNorm(num_groups=1,
                                              num_channels=8),
                                 self.activation)
 
@@ -90,7 +89,7 @@ class InverseModel(nn.Module):
                               num_layers=1,
                               batch_first=True,
                               bidirectional=True)
-        self.out = nn.Linear(in_features=16, out_features=self.num_angles)
+        self.out = nn.Linear(in_features=16, out_features=1)
 
 
         for m in self.modules():
@@ -128,9 +127,9 @@ class InverseModel(nn.Module):
 
 
 
-class ForwardModel(nn.Module):
+class forward_model(nn.Module):
     def __init__(self,num_channels):
-        super(ForwardModel, self).__init__()
+        super(forward_model, self).__init__()
         self.activation = nn.ReLU()
         self.cnn = nn.Sequential(nn.Conv1d(in_channels=num_channels, out_channels=4, kernel_size=9, padding=4),
                                  self.activation,
@@ -157,10 +156,10 @@ class ForwardModel(nn.Module):
 # class InverseModel(nn.Module):
 #     def __init__(self, num_angles):
 #         super(InverseModel, self).__init__()
-#         self.num_angles = num_angles
+#         1 = num_angles
 #         self.activation = nn.ReLU()
 #
-#         self.cnn1 = nn.Sequential(nn.Conv1d(in_channels=self.num_angles,
+#         self.cnn1 = nn.Sequential(nn.Conv1d(in_channels=1,
 #                                            out_channels=8,
 #                                            kernel_size=5,
 #                                            padding=2,
@@ -168,7 +167,7 @@ class ForwardModel(nn.Module):
 #                                   nn.GroupNorm(num_groups=1,
 #                                                num_channels=8))
 #
-#         self.cnn2 = nn.Sequential(nn.Conv1d(in_channels=self.num_angles,
+#         self.cnn2 = nn.Sequential(nn.Conv1d(in_channels=1,
 #                                            out_channels=8,
 #                                            kernel_size=5,
 #                                            padding=6,
@@ -176,7 +175,7 @@ class ForwardModel(nn.Module):
 #                                   nn.GroupNorm(num_groups=1,
 #                                                num_channels=8))
 #
-#         self.cnn3 = nn.Sequential(nn.Conv1d(in_channels=self.num_angles,
+#         self.cnn3 = nn.Sequential(nn.Conv1d(in_channels=1,
 #                                            out_channels=8,
 #                                            kernel_size=5,
 #                                            padding=12,
@@ -201,7 +200,7 @@ class ForwardModel(nn.Module):
 #                                               num_channels=16),
 #                                  self.activation)
 #
-#         self.gru = nn.GRU(input_size=self.num_angles,
+#         self.gru = nn.GRU(input_size=1,
 #                           hidden_size=8,
 #                           num_layers=2,
 #                           batch_first=True,
@@ -302,4 +301,3 @@ class ForwardModel(nn.Module):
 
 
 #%%
-
