@@ -7,9 +7,10 @@ from torch.nn.functional import conv1d
 
 
 class inverse_model(nn.Module):
-    def __init__(self, vertical_scale):
+    def __init__(self,resolution_ratio=4,nonlinearity="tanh"):
         super(inverse_model, self).__init__()
-        self.vertical_scale = vertical_scale
+        self.resolution_ratio = resolution_ratio
+        self.activation =  nn.ReLU() if nonlinearity=="relu" else nn.Tanh()
         self.activation = nn.Tanh()
 
         self.cnn1 = nn.Sequential(nn.Conv1d(in_channels=1,
@@ -128,22 +129,22 @@ class inverse_model(nn.Module):
 
 
 class forward_model(nn.Module):
-    def __init__(self,num_channels):
+    def __init__(self,resolution_ratio=4,nonlinearity="tanh"):
         super(forward_model, self).__init__()
-        self.activation = nn.ReLU()
-        self.cnn = nn.Sequential(nn.Conv1d(in_channels=num_channels, out_channels=4, kernel_size=9, padding=4),
+        self.resolution_ratio = resolution_ratio
+        self.activation =  nn.ReLU() if nonlinearity=="relu" else nn.Tanh()
+        self.cnn = nn.Sequential(nn.Conv1d(in_channels=1, out_channels=4, kernel_size=9, padding=4),
                                  self.activation,
                                  nn.Conv1d(in_channels=4, out_channels=4,kernel_size=7, padding=3),
                                  self.activation,
                                  nn.Conv1d(in_channels=4, out_channels=1,kernel_size=3, padding=1))
 
 
-        self.wavelet = nn.Conv1d(in_channels=num_channels,
-                             out_channels=num_channels,
-                             stride=4,
-                             kernel_size=51,
-                             padding=25,
-                             groups=num_channels)
+        self.wavelet = nn.Conv1d(in_channels=1,
+                             out_channels=1,
+                             stride=self.resolution_ratio,
+                             kernel_size=50,
+                             padding=int((50-self.resolution_ratio+2)/2))
 
 
 

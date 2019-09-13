@@ -1,4 +1,4 @@
-AI import argparse
+import argparse
 import numpy as np
 import torch
 from os.path import isdir
@@ -8,7 +8,7 @@ from torch.utils import data
 from core.functions import *
 from torch import nn, optim
 from datetime import datetime
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as pltself
 from tqdm import tqdm
 import wget
 
@@ -34,7 +34,6 @@ def get_data(args, test=False):
         url= "https://www.dropbox.com/s/5r4wcg8903wzlie/data.npy?raw=1"
         wget.download(url,"./")
 
-    data_dic = np.load("data.npy",allow_pickle=True).item()
     seismic_data = data_dic["seismic"]
     acoustic_impedance_data = data_dic["acoustic_impedance"]
 
@@ -89,8 +88,8 @@ def get_data(args, test=False):
 def get_models(args):
 
     if args.test_checkpoint is None:
-        inverse_net = inverse_model(in_channels=len(args.incident_angles), nonlinearity=args.nonlinearity)
-        forward_net = forward_model(in_channels=len(args.incident_angles), nonlinearity=args.nonlinearity)
+        inverse_net = inverse_model(nonlinearity=args.nonlinearity)
+        forward_net = forward_model(nonlinearity=args.nonlinearity)
         optimizer = optim.Adam(list(inverse_model.parameters())+list(forward_model.parameters()), amsgrad=True,lr=0.005)
     else:
         try:
