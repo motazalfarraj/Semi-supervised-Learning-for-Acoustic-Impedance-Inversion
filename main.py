@@ -1,7 +1,6 @@
-import argparse
+AI import argparse
 import numpy as np
 import torch
-from bruges.filters import wavelets
 from os.path import isdir
 import os
 from core.models import inverse_model, forward_model
@@ -12,7 +11,6 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import wget
-import hashlib
 
 
 
@@ -29,49 +27,48 @@ torch.backends.cudnn.benchmark = False
 def get_data(args, test=False):
     #Loading data
     try:
-        data_dic = np.load("data.npy",allow_pickle=True).item()
+        data_dic = np.load("data/data.npy",allow_pickle=True).item()
 
     except FileNotFoundError:
         print("Data file not found. Downloading the data..")
-        url= "https://www.dropbox.com/s/66u2hbbrvc15lyp/data.npy?raw=1"
+        url= "https://www.dropbox.com/s/5r4wcg8903wzlie/data.npy?raw=1"
         wget.download(url,"./")
 
-    assert hashlib.md5(open("./data.npy", "rb").read()).hexdigest()=="1fc229e7b7042829b8a834e6850ec9e5", "Data file checksum did not match. Redownload the data file"
-
     data_dic = np.load("data.npy",allow_pickle=True).item()
-    seismic_data = data_dic["synth_seismic_15db_noise"]
-    elastic_impedance_data = data_dic["elastic_impedance"]
+    seismic_data = data_dic["seismic"]
+    acoustic_impedance_data = data_dic["acoustic_impedance"]
 
-    assert seismic_data.shape[1]==len(args.incident_angles) ,'Data dimensions are not consistent with incident angles. Got {} incident angles and {} in data dimensions'.format(len(args.incident_angles),seismic_data.shape[1])
-    assert seismic_data.shape[1]==elastic_impedance_data.shape[1] ,'Data dimensions are not consistent. Got {} channels for seismic data and {} for elastic elastic impedance dimensions'.format(seismic_data.shape[1],elastic_impedance_data.shape[1])
+    assert seismic_data.shape[1]==acoustic_impedance_data.shape[1] ,'Data dimensions are not consistent. Got {} channels for seismic data and {} for acoustic acoustic impedance dimensions'.format(seismic_data.shape[1],acoustic_impedance_data.shape[1])
+    assert seismic_data.shape[0]==acoustic_impedance_data.shape[0] ,'Number of traces is not consistent. Got {} traces for seismic data and {} traces for acoustic acoustic impedance'.format(seismic_data.shape[0],acoustic_impedance_data.shape[0])
+
 
     seismic_mean = torch.tensor(np.mean(seismic_data,axis=(0,-1),keepdims=True)).float()
     seismic_std = torch.tensor(np.std(seismic_data,axis=(0,-1),keepdims=True)).float()
 
-    elastic_mean= torch.tensor(np.mean(elastic_impedance_data, keepdims=True)).float()
-    elastic_std = torch.tensor(np.std(elastic_impedance_data,keepdims=True)).float()
+    acoustic_mean= torch.tensor(np.mean(acoustic_impedance_data, keepdims=True)).float()
+    acoustic_std = torch.tensor(np.std(acoustic_impedance_data,keepdims=True)).float()
 
 
     seismic_data = torch.tensor(seismic_data).float()
-    elastic_impedance_data = torch.tensor(elastic_impedance_data).float()
+    acoustic_impedance_data = torch.tensor(acoustic_impedance_data).float()
 
     if torch.cuda.is_available():
         seismic_data = seismic_data.cuda()
-        elastic_impedance_data = elastic_impedance_data.cuda()
+        acoustic_impedance_data = acoustic_impedance_data.cuda()
         seismic_mean = seismic_mean.cuda()
         seismic_std = seismic_std.cuda()
-        elastic_mean = elastic_mean.cuda()
-        elastic_std = elastic_std.cuda()
+        acoustic_mean = acoustic_mean.cuda()
+        acoustic_std = acoustic_std.cuda()
 
     seismic_normalization = Normalization(mean_val=seismic_mean,
                                           std_val=seismic_std)
 
-    elastic_normalization = Normalization(mean_val=elastic_mean,
-                                          std_val=elastic_std)
+    acoustic_normalization = Normalization(mean_val=acoustic_mean,
+                                          std_val=acoustic_std)
 
 
     seismic_data = seismic_normalization.normalize(seismic_data)
-    elastic_impedance_data = elastic_normalization.normalize(elastic_impedance_data)
+    acoustic_impedance_data = acoustic_normalization.normalize(acoustic_impedance_data)
 
 
 
@@ -80,31 +77,31 @@ def get_data(args, test=False):
         indecies = np.arange(0,num_samples)
         train_indecies = indecies[(np.linspace(0,len(indecies)-1,args.num_train_wells)).astype(int)]
 
-        train_data = data.Subset(data.TensorDataset(seismic_data,elastic_impedance_data), train_indecies)
+        train_data = data.Subset(data.TensorDataset(seismic_data,acoustic_impedance_data), train_indecies)
         train_loader = data.DataLoader(train_data, batch_size=args.batch_size, shuffle=False)
 
         unlabeled_loader = data.DataLoader(data.TensorDataset(seismic_data), batch_size=args.batch_size, shuffle=True)
-        return train_loader, unlabeled_loader, seismic_normalization, elastic_normalization
+        return train_loader, unlabeled_loader, seismic_normalization, acoustic_normalization
     else:
-        test_loader = data.DataLoader(data.TensorDataset(seismic_data,elastic_impedance_data), batch_size=args.batch_size, shuffle=False, drop_last=False)
-        return test_loader, seismic_normalization, elastic_normalization
+        test_loader = data.DataLoader(data.TensorDataset(seismic_data,acoustic_impedance_data), batch_size=args.batch_size, shuffle=False, drop_last=False)
+        return test_loader, seismic_normalization, acoustic_normalization
 
 def get_models(args):
 
     if args.test_checkpoint is None:
         inverse_net = inverse_model(in_channels=len(args.incident_angles), nonlinearity=args.nonlinearity)
+        forward_net = forward_model(in_channels=len(args.incident_angles), nonlinearity=args.nonlinearity)
+        optimizer = optim.Adam(list(inverse_model.parameters())+list(forward_model.parameters()), amsgrad=True,lr=0.005)
     else:
         try:
-            inverse_net = torch.load(args.test_checkpoint)
+            inverse_net = torch.load(args.test_checkpoint + "_inverse")
+            forward_net = torch.load(args.test_checkpoint + "_forward")
+            optimizer = torch.load(args.test_checkpoint + "optimizer")
+
         except FileNotFoundError:
             print("No checkpoint found at '{}'- Please specify the model for testing".format(args.test_checkpoint))
             exit()
 
-    #Set up forward model
-    # For wavelet info, refer to https://github.com/agile-geoscience/bruges/blob/master/bruges/filters/wavelets.py
-    # For simpicity, the same wavlet is used for all incident angles
-    wavelet, wavelet_time = wavelets.ormsby(args.wavelet_duration, args.dt,args.f, return_t=True)
-    wavelet = torch.tensor(wavelet).unsqueeze(dim=0).unsqueeze(dim=0).float()
     forward_net = forward_model(wavelet=wavelet)
 
     if torch.cuda.is_available():
@@ -116,11 +113,10 @@ def get_models(args):
 def train(args):
 
     #writer = SummaryWriter()
-    train_loader, unlabeled_loader, seismic_normalization, elastic_normalization = get_data(args)
-    inverse_net, forward_net = get_models(args)
+    train_loader, unlabeled_loader, seismic_normalization, acoustic_normalization = get_data(args)
+    inverse_net, forward_net, optimizer = get_models(args)
     inverse_net.train()
     criterion = nn.MSELoss()
-    optimizer = inverse_net.optimizer
 
     #make a direcroty to save models if it doesn't exist
     if not isdir("checkpoints"):
@@ -150,7 +146,7 @@ def train(args):
                     x_u = next(unlabeled)[0]
 
                 y_u_pred = inverse_net(x_u)
-                y_u_pred = elastic_normalization.unnormalize(y_u_pred)
+                y_u_pred = acoustic_normalization.unnormalize(y_u_pred)
                 x_u_rec = forward_net(y_u_pred)
                 x_u_rec = seismic_normalization.normalize(x_u_rec)
 
@@ -164,14 +160,16 @@ def train(args):
 
             train_loss.append(loss.detach().clone())
 
-    torch.save(inverse_net,"./checkpoints/{}".format(args.session_name))
+    torch.save(inverse_net,"./checkpoints/{}_inverse".format(args.session_name))
+    torch.save(forward_net,"./checkpoints/{}_forward".format(args.session_name))
+    torch.save(optimizer,"./checkpoints/{}_optimizer".format(args.session_name))
 
 def test(args):
     #make a direcroty to save precited sections
     if not isdir("output_images"):
         os.mkdir("output_images")
 
-    test_loader, seismic_normalization, elastic_normalization = get_data(args, test=True)
+    test_loader, seismic_normalization, acoustic_normalization = get_data(args, test=True)
     if args.test_checkpoint is None:
         args.test_checkpoint = "./checkpoints/{}".format(args.session_name)
     inverse_net, forward_net = get_models(args)
@@ -192,7 +190,7 @@ def test(args):
             test_property_corr.append(corr)
             test_property_r2.append(r2)
 
-            x_rec = forward_net(elastic_normalization.unnormalize(y_pred))
+            x_rec = forward_net(acoustic_normalization.unnormalize(y_pred))
             x_rec = seismic_normalization.normalize(x_rec)
             seismic_loss = criterion(x_rec, x)/np.prod(x.shape)
             loss = args.alpha*property_loss + args.beta*seismic_loss
@@ -207,8 +205,8 @@ def test(args):
         predicted_impedance = torch.cat(predicted_impedance, dim=0)
         true_impedance = torch.cat(true_impedance, dim=0)
 
-        predicted_impedance = elastic_normalization.unnormalize(predicted_impedance)
-        true_impedance = elastic_normalization.unnormalize(true_impedance)
+        predicted_impedance = acoustic_normalization.unnormalize(predicted_impedance)
+        true_impedance = acoustic_normalization.unnormalize(true_impedance)
 
         if torch.cuda.is_available():
             predicted_impedance = predicted_impedance.cpu()
@@ -218,7 +216,7 @@ def test(args):
         true_impedance = true_impedance.numpy()
 
         #diplaying estimated section
-        cols = ['{}'.format(col) for col in ['Predicted EI','True EI', 'Absolute difference']]
+        cols = ['{}'.format(col) for col in ['Predicted AI','True AI', 'Absolute difference']]
         rows = [r'$\theta=$ {}$^\circ$'.format(row) for row in args.incident_angles]
         fig, axes = plt.subplots(nrows=len(args.incident_angles), ncols=3)
 
@@ -251,7 +249,7 @@ def test(args):
 if __name__ == '__main__':
     ## Arguments and parameters
     parser = argparse.ArgumentParser()
-    parser.add_argument('-num_train_wells', type=int, default=10, help="Number of EI traces from the model to be used for validation")
+    parser.add_argument('-num_train_wells', type=int, default=20, help="Number of AI traces from the model to be used for validation")
     parser.add_argument('-max_epoch', type=int, default=500, help="maximum number of training epochs")
     parser.add_argument('-batch_size', type=int, default=40,help="Batch size for training")
     parser.add_argument('-alpha', type=float, default=1, help="weight of property loss term")
@@ -261,11 +259,7 @@ if __name__ == '__main__':
     parser.add_argument('-nonlinearity', action="store", type=str, default="tanh",help="Type of nonlinearity for the CNN [tanh, relu]", choices=["tanh","relu"])
 
     ## Do not change these values unless you use the code on a different data and edit the code accordingly
-    parser.add_argument('-dt', type=float, default=1e-3, help='Time resolution in seconds')
-    parser.add_argument('-wavelet_duration',  type=float, default=0.2, help='wavelet duration in seconds')
-    parser.add_argument('-f', default="5, 10, 60, 80", help="Frequency of wavelet. if multiple frequencies use , to seperate them with no spaces, e.g., -f \"5,10,60,80\"", type=lambda x: np.squeeze(np.array(x.split(",")).astype(float)))
-    parser.add_argument('-resolution_ratio', type=int, default=6, action="store",help="resolution mismtach between seismic and EI")
-    parser.add_argument('-incident_angles', type=float, default=np.arange(0, 30+ 1, 10), help="Incident angles of the input seismic and EI")
+    parser.add_argument('-resolution_ratio', type=int, default=4, action="store",help="resolution mismtach between seismic and AI")
     args = parser.parse_args()
 
     if args.test_checkpoint is not None:
