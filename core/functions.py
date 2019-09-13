@@ -49,6 +49,4 @@ def display_results(loss, property_corr, property_r2, args, header):
     property_corr = torch.mean(torch.cat(property_corr), dim=0).squeeze()
     property_r2 = torch.mean(torch.cat(property_r2), dim=0).squeeze()
     loss = torch.mean(torch.tensor(loss))
-    corr_text = " | ".join([u"{:d}\xb0: {:.4f}".format(args.incident_angles[i], property_corr[i].squeeze()) for i in range(len(args.incident_angles))])
-    r2_text =   " | ".join([u"{:d}\xb0: {:.4f}".format(args.incident_angles[i], property_r2[i].squeeze()) for i in range(len(args.incident_angles))])
-    print("loss: {:.4f}\nCorrelation: {:s}\nr2 Coeff.  : {:s}".format(loss,corr_text,r2_text))
+    print("loss: {:.4f}\nCorrelation: {:0.4f}\nr2 Coeff.  : {:0.4f}".format(loss,property_corr,property_r2))

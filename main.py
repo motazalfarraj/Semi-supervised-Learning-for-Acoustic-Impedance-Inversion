@@ -8,7 +8,7 @@ from torch.utils import data
 from core.functions import *
 from torch import nn, optim
 from datetime import datetime
-import matplotlib.pyplot as pltself
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 import wget
 
@@ -32,7 +32,7 @@ def get_data(args, test=False):
     except FileNotFoundError:
         print("Data file not found. Downloading the data..")
         url= "https://www.dropbox.com/s/5r4wcg8903wzlie/data.npy?raw=1"
-        wget.download(url,"./")
+        wget.download(url,"")
 
     seismic_data = data_dic["seismic"]
     acoustic_impedance_data = data_dic["acoustic_impedance"]
@@ -95,7 +95,7 @@ def get_models(args):
         try:
             inverse_net = torch.load(args.test_checkpoint + "_inverse")
             forward_net = torch.load(args.test_checkpoint + "_forward")
-            optimizer = torch.load(args.test_checkpoint + "optimizer")
+            optimizer = torch.load(args.test_checkpoint + "_optimizer")
 
         except FileNotFoundError:
             print("No checkpoint found at '{}'- Please specify the model for testing".format(args.test_checkpoint))
@@ -157,9 +157,9 @@ def train(args):
 
             train_loss.append(loss.detach().clone())
 
-    torch.save(inverse_net,"./checkpoints/{}_inverse".format(args.session_name))
-    torch.save(forward_net,"./checkpoints/{}_forward".format(args.session_name))
-    torch.save(optimizer,"./checkpoints/{}_optimizer".format(args.session_name))
+    torch.save(inverse_net,"checkpoints/{}_inverse".format(args.session_name))
+    torch.save(forward_net,"checkpoints/{}_forward".format(args.session_name))
+    torch.save(optimizer,"checkpoints/{}_optimizer".format(args.session_name))
 
 def test(args):
     #make a direcroty to save precited sections
@@ -168,7 +168,7 @@ def test(args):
 
     test_loader, seismic_normalization, acoustic_normalization = get_data(args, test=True)
     if args.test_checkpoint is None:
-        args.test_checkpoint = "./checkpoints/{}".format(args.session_name)
+        args.test_checkpoint = "checkpoints/{}".format(args.session_name)
     inverse_net, forward_net, _ = get_models(args)
     criterion = nn.MSELoss(reduction="sum")
     predicted_impedance = []
@@ -213,31 +213,24 @@ def test(args):
         true_impedance = true_impedance.numpy()
 
         #diplaying estimated section
-        cols = ['{}'.format(col) for col in ['Predicted AI','True AI', 'Absolute difference']]
-        rows = [r'$\theta=$ {}$^\circ$'.format(row) for row in args.incident_angles]
-        fig, axes = plt.subplots(nrows=len(args.incident_angles), ncols=3)
 
-        for i, theta in enumerate(args.incident_angles):
-            axes[i][0].imshow(predicted_impedance[:,i].T, cmap='rainbow',aspect=0.5, vmin=true_impedance.min(), vmax=true_impedance.max())
-            axes[i][0].axis('off')
-            axes[i][1].imshow(true_impedance[:,i].T, cmap='rainbow',aspect=0.5,vmin=true_impedance.min(), vmax=true_impedance.max())
-            axes[i][1].axis('off')
-            axes[i][2].imshow(abs(true_impedance[:,i].T-predicted_impedance[:,i].T), cmap='gray',aspect=0.5)
-            axes[i][2].axis('off')
+        plt.subplot(3,1,1)
+        plt.imshow(predicted_impedance[:,0].T, cmap='rainbow',aspect=0.5, vmin=true_impedance.min(), vmax=true_impedance.max())
+        plt.axis('off')
+        plt.title("Estimated Acoustic Impedance")
 
-        pad = 10 # in points
-        for ax, row in zip(axes[:,0], rows):
-            ax.annotate(row,xy=(0,0.5), xytext=(-pad,0), xycoords='axes fraction', textcoords='offset points', ha='right', va='center')
+        plt.subplot(3,1,2)
+        plt.imshow(true_impedance[:,0].T, cmap='rainbow',aspect=0.5,vmin=true_impedance.min(), vmax=true_impedance.max())
+        plt.title("True Acoustic Impedance")
+        plt.axis('off')
 
+        plt.subplot(3,1,3)
+        plt.imshow(abs(true_impedance[:,0].T-predicted_impedance[:,0].T), cmap='gray',aspect=0.5)
+        plt.title("Absolute Difference")
+        plt.axis('off')
 
-        for ax, col in zip(axes[0], cols):
-            ax.annotate(col, xy=(0.5, 1), xytext=(0, pad),
-                        xycoords='axes fraction', textcoords='offset points', ha='center', va='baseline')
-
-
-
-        fig.tight_layout()
-        plt.savefig("./output_images/{}.png".format(args.test_checkpoint.split("/")[-1]))
+        plt.tight_layout()
+        plt.savefig("output_images/{}.png".format(args.test_checkpoint.split("/")[-1]))
 
         plt.show()
 
