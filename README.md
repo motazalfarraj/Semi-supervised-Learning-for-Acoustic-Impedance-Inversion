@@ -10,12 +10,6 @@ M. Alfarraj and G. AlRegib, "**Semi-Supervised Learning for Acoustic Impedance I
 ## Abstract
 Recent applications of deep learning in the seismic domain have shown great potential in different areas such as inversion and interpretation. Deep learning algorithms, in general, require tremendous amounts of labeled data to train properly. To overcome this issue, we propose a semi-supervised framework for acoustic impedance inversion based on convolutional and recurrent neural networks. Specifically, seismic traces and acoustic impedance traces are modeled as time series. Then, a neural-network-based inversion model comprising convolutional and recurrent neural layers is used to invert seismic data for acoustic impedance. The proposed workflow uses well log data to guide the inversion. In addition, it utilizes a learned seismic forward model to regularize the training and to serve as a geophysical constraint for the inversion. The proposed workflow achieves an average correlation of 98% between the estimated and target elastic impedance using 20 AI traces for training. 
 
-## Sample Results 
-
-#### Estimated EI Section
-
-#### Sample traces 
-
 
 ## Data 
 The data used in this code are from the elastic model of [Marmousi 2](https://library.seg.org/doi/abs/10.1190/1.1817083)
@@ -49,7 +43,7 @@ python main.py
  However, you can choose those parameters by including the arguments and their values. For example, to change the number of training traces, you can run: 
  
 ```bash 
-python main.py -num_train_wells 10
+python main.py -num_train_wells 20
 ```
 
 The list arguments can be found in the file `main.py`.  
