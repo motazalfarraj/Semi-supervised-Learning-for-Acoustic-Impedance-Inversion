@@ -41,8 +41,8 @@ def get_data(args, test=False):
     assert seismic_data.shape[0]==acoustic_impedance_data.shape[0] ,'Number of traces is not consistent. Got {} traces for seismic data and {} traces for acoustic acoustic impedance'.format(seismic_data.shape[0],acoustic_impedance_data.shape[0])
 
 
-    seismic_mean = torch.tensor(np.mean(seismic_data,axis=(0,-1),keepdims=True)).float()
-    seismic_std = torch.tensor(np.std(seismic_data,axis=(0,-1),keepdims=True)).float()
+    seismic_mean = torch.tensor(np.mean(seismic_data,keepdims=True)).float()
+    seismic_std = torch.tensor(np.std(seismic_data,keepdims=True)).float()
 
     acoustic_mean= torch.tensor(np.mean(acoustic_impedance_data, keepdims=True)).float()
     acoustic_std = torch.tensor(np.std(acoustic_impedance_data,keepdims=True)).float()
@@ -54,8 +54,10 @@ def get_data(args, test=False):
     if torch.cuda.is_available():
         seismic_data = seismic_data.cuda()
         acoustic_impedance_data = acoustic_impedance_data.cuda()
+
         seismic_mean = seismic_mean.cuda()
         seismic_std = seismic_std.cuda()
+
         acoustic_mean = acoustic_mean.cuda()
         acoustic_std = acoustic_std.cuda()
 
@@ -68,7 +70,6 @@ def get_data(args, test=False):
 
     seismic_data = seismic_normalization.normalize(seismic_data)
     acoustic_impedance_data = acoustic_normalization.normalize(acoustic_impedance_data)
-
 
 
     if not test:
@@ -127,9 +128,10 @@ def train(args):
         train_property_r2 = []
         for x,y in train_loader:
             optimizer.zero_grad()
-
             y_pred = inverse_net(x)
-            property_loss = criterion(y_pred,y)
+            x_rec = forward_net(y)
+
+            property_loss = criterion(y_pred,y)+criterion(x_rec, x)
             corr, r2 = metrics(y_pred.detach(),y.detach())
             train_property_corr.append(corr)
             train_property_r2.append(r2)
@@ -143,14 +145,11 @@ def train(args):
                     x_u = next(unlabeled)[0]
 
                 y_u_pred = inverse_net(x_u)
-                y_u_pred = acoustic_normalization.unnormalize(y_u_pred)
                 x_u_rec = forward_net(y_u_pred)
-                x_u_rec = seismic_normalization.normalize(x_u_rec)
 
                 seismic_loss = criterion(x_u_rec,x_u)
             else:
                 seismic_loss=0
-
             loss = args.alpha*property_loss + args.beta*seismic_loss
             loss.backward()
             optimizer.step()
@@ -187,8 +186,7 @@ def test(args):
             test_property_corr.append(corr)
             test_property_r2.append(r2)
 
-            x_rec = forward_net(acoustic_normalization.unnormalize(y_pred))
-            x_rec = seismic_normalization.normalize(x_rec)
+            x_rec = forward_net(y_pred)
             seismic_loss = criterion(x_rec, x)/np.prod(x.shape)
             loss = args.alpha*property_loss + args.beta*seismic_loss
             test_loss.append(loss.item())
@@ -239,11 +237,11 @@ def test(args):
 if __name__ == '__main__':
     ## Arguments and parameters
     parser = argparse.ArgumentParser()
-    parser.add_argument('-num_train_wells', type=int, default=20, help="Number of AI traces from the model to be used for validation")
-    parser.add_argument('-max_epoch', type=int, default=500, help="maximum number of training epochs")
-    parser.add_argument('-batch_size', type=int, default=40,help="Batch size for training")
+    parser.add_argument('-num_train_wells', type=int, default=20, help="Number of AI traces from the model to be used for training")
+    parser.add_argument('-max_epoch', type=int, default=1000, help="maximum number of training epochs")
+    parser.add_argument('-batch_size', type=int, default=50,help="Batch size for training")
     parser.add_argument('-alpha', type=float, default=1, help="weight of property loss term")
-    parser.add_argument('-beta', type=float, default=1, help="weight of seismic loss term")
+    parser.add_argument('-beta', type=float, default=0.2, help="weight of seismic loss term")
     parser.add_argument('-test_checkpoint', type=str, action="store", default=None,help="path to model to test on. When this flag is used, no training is performed")
     parser.add_argument('-session_name', type=str, action="store", default=datetime.now().strftime('%b%d_%H%M%S'),help="name of the session to be ised in saving the model")
     parser.add_argument('-nonlinearity', action="store", type=str, default="tanh",help="Type of nonlinearity for the CNN [tanh, relu]", choices=["tanh","relu"])

@@ -11,7 +11,6 @@ class inverse_model(nn.Module):
         super(inverse_model, self).__init__()
         self.resolution_ratio = resolution_ratio
         self.activation =  nn.ReLU() if nonlinearity=="relu" else nn.Tanh()
-        self.activation = nn.Tanh()
 
         self.cnn1 = nn.Sequential(nn.Conv1d(in_channels=1,
                                            out_channels=8,
@@ -94,13 +93,10 @@ class inverse_model(nn.Module):
 
 
         for m in self.modules():
-            if isinstance(m, nn.Conv1d):
+            if isinstance(m, nn.Conv1d) or isinstance(m, nn.ConvTranspose1d):
                 nn.init.xavier_uniform_(m.weight.data)
                 m.bias.data.zero_()
-            elif isinstance(m, nn.ConvTranspose1d):
-                nn.init.xavier_uniform_(m.weight.data)
-                m.bias.data.zero_()
-            elif isinstance(m, nn.BatchNorm1d):
+            elif isinstance(m, nn.GroupNorm):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
             elif isinstance(m, nn.Linear):
@@ -145,8 +141,6 @@ class forward_model(nn.Module):
                              stride=self.resolution_ratio,
                              kernel_size=50,
                              padding=int((50-self.resolution_ratio+2)/2))
-
-
 
     def forward(self, x):
         x = self.cnn(x)
