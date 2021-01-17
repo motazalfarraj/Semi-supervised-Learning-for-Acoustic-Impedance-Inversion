@@ -31,7 +31,7 @@ def get_data(args, test=False):
 
     except FileNotFoundError:
         print("Data file not found. Downloading the data..")
-        url= "https://www.dropbox.com/s/5r4wcg8903wzlie/data.npy?raw=1"
+        url= "https://www.dropbox.com/s/bvqfud2dv731v59/data.npy?raw=1"
         wget.download(url,"")
 
     seismic_data = data_dic["seismic"]
